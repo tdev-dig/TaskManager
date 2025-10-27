@@ -12,7 +12,7 @@ export type Database = {
       profiles: {
         Row: {
           id: string
-          role: 'admin' | 'commercial' | 'client'
+          role: Database['public']['Enums']['user_role']
           nom: string
           prenom: string
           email: string
@@ -21,7 +21,7 @@ export type Database = {
         }
         Insert: {
           id: string
-          role: 'admin' | 'commercial' | 'client'
+          role?: Database['public']['Enums']['user_role']
           nom: string
           prenom: string
           email: string
@@ -30,7 +30,7 @@ export type Database = {
         }
         Update: {
           id?: string
-          role?: 'admin' | 'commercial' | 'client'
+          role?: Database['public']['Enums']['user_role']
           nom?: string
           prenom?: string
           email?: string
@@ -72,7 +72,7 @@ export type Database = {
           commercial_id: string
           produit: string
           quantite: number
-          statut: 'en_attente' | 'en_cours' | 'termine' | 'livre'
+          statut: Database['public']['Enums']['order_status']
           date_livraison: string
           created_at: string
         }
@@ -83,7 +83,7 @@ export type Database = {
           commercial_id: string
           produit: string
           quantite: number
-          statut?: 'en_attente' | 'en_cours' | 'termine' | 'livre'
+          statut?: Database['public']['Enums']['order_status']
           date_livraison: string
           created_at?: string
         }
@@ -94,7 +94,7 @@ export type Database = {
           commercial_id?: string
           produit?: string
           quantite?: number
-          statut?: 'en_attente' | 'en_cours' | 'termine' | 'livre'
+          statut?: Database['public']['Enums']['order_status']
           date_livraison?: string
           created_at?: string
         }
@@ -130,7 +130,8 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      user_role: 'admin' | 'commercial' | 'client'
+      order_status: 'en_attente' | 'en_cours' | 'termine' | 'livre'
     }
   }
 }

@@ -3,8 +3,9 @@
 ## 📋 Prérequis
 
 1. Un compte Supabase (gratuit sur https://supabase.com)
-2. Node.js 18+ installé
-3. npm ou yarn
+2. Un compte Vercel (gratuit sur https://vercel.com)
+3. Node.js 18+ installé
+4. npm ou yarn
 
 ## 🚀 Étapes de déploiement
 
@@ -13,11 +14,11 @@
 #### Créer un projet Supabase
 1. Allez sur https://supabase.com
 2. Créez un nouveau projet
-3. Attendez que le projet soit initialisé
+3. Attendez que le projet soit initialisé (5-10 minutes)
 
-#### Exécuter le schéma SQL
+#### Exécuter le schéma SQL amélioré
 1. Dans le dashboard Supabase, allez dans **SQL Editor**
-2. Copiez le contenu du fichier `supabase/schema.sql`
+2. Copiez le contenu du fichier `supabase/schema.sql` (version mise à jour avec ENUMs et RLS corrigé)
 3. Collez-le dans l'éditeur SQL
 4. Exécutez le script (bouton "Run")
 
@@ -26,6 +27,7 @@
 2. Copiez:
    - `Project URL`
    - `anon public` key
+   - `service_role` key (pour le script de seed data)
 
 ### 2. Configuration de l'application
 
@@ -36,6 +38,7 @@
 ```env
 NEXT_PUBLIC_SUPABASE_URL=votre-project-url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=votre-anon-key
+SUPABASE_SERVICE_ROLE_KEY=votre-service-role-key
 ```
 
 #### Installer les dépendances
@@ -43,17 +46,30 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=votre-anon-key
 npm install
 ```
 
-### 3. Créer le premier administrateur
+### 3. Créer les données de test (2 options)
 
-Le premier utilisateur admin doit être créé manuellement:
+#### Option A: Script automatisé (Recommandé)
+```bash
+# Installer les dépendances si pas déjà fait
+npm install @supabase/supabase-js
 
+# Exécuter le script de création automatique
+node supabase/setup-seed-data.js
+```
+
+#### Option B: Création manuelle
 1. Dans Supabase, allez dans **Authentication** > **Users**
-2. Cliquez sur **Add user** > **Create new user**
-3. Entrez un email et un mot de passe
-4. Allez dans **Table Editor** > **profiles**
-5. Trouvez l'utilisateur créé
-6. Modifiez le champ `role` en `admin`
-7. Sauvegardez
+2. Créez manuellement les utilisateurs avec **Add user** > **Create new user**:
+   - admin@taskmanager.com (mot de passe: admin123!)
+   - commercial1@taskmanager.com (mot de passe: commercial123!)
+   - commercial2@taskmanager.com (mot de passe: commercial123!)
+   - client1@taskmanager.com (mot de passe: client123!)
+   - client2@taskmanager.com (mot de passe: client123!)
+   - client3@taskmanager.com (mot de passe: client123!)
+
+3. Récupérez les UUIDs des utilisateurs créés
+4. Modifiez le fichier `supabase/seed-manual.sql` avec les vrais UUIDs
+5. Exécutez le script dans l'éditeur SQL de Supabase
 
 ### 4. Lancer l'application en développement
 
@@ -63,23 +79,45 @@ npm run dev
 
 L'application sera accessible sur http://localhost:3000
 
-### 5. Déploiement en production
+### 5. Déploiement en production sur Vercel
 
-#### Option 1: Vercel (Recommandé)
+#### Préparation du projet
+1. Assurez-vous que le fichier `vercel.json` est présent (déjà configuré)
+2. Vérifiez que toutes les dépendances sont dans `package.json`
 
+#### Déploiement via Vercel CLI (Recommandé)
+```bash
+# Installer Vercel CLI
+npm i -g vercel
+
+# Se connecter à Vercel
+vercel login
+
+# Déployer le projet
+vercel
+
+# Configurer les variables d'environnement
+vercel env add NEXT_PUBLIC_SUPABASE_URL
+vercel env add NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+# Redéployer avec les nouvelles variables
+vercel --prod
+```
+
+#### Déploiement via Dashboard Vercel
 1. Créez un compte sur https://vercel.com
-2. Importez votre projet GitHub
-3. Ajoutez les variables d'environnement dans Vercel:
+2. Connectez votre repository GitHub
+3. Importez le projet TaskManager PLV
+4. Dans les paramètres du projet, ajoutez les variables d'environnement:
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-4. Déployez
+5. Déployez automatiquement
 
-#### Option 2: Build local
-
-```bash
-npm run build
-npm start
-```
+#### Configuration post-déploiement
+1. Vérifiez que l'application se lance correctement
+2. Testez la connexion avec les comptes créés
+3. Vérifiez les politiques RLS dans Supabase
+4. Configurez le domaine personnalisé si nécessaire
 
 ## 🔐 Sécurité
 
