@@ -12,7 +12,7 @@ export type Database = {
       profiles: {
         Row: {
           id: string
-          role: 'admin' | 'commercial' | 'client'
+          roles: ('admin' | 'commercial' | 'client')[]
           nom: string
           prenom: string
           email: string
@@ -21,7 +21,7 @@ export type Database = {
         }
         Insert: {
           id: string
-          role: 'admin' | 'commercial' | 'client'
+          roles: ('admin' | 'commercial' | 'client')[]
           nom: string
           prenom: string
           email: string
@@ -30,7 +30,7 @@ export type Database = {
         }
         Update: {
           id?: string
-          role?: 'admin' | 'commercial' | 'client'
+          roles?: ('admin' | 'commercial' | 'client')[]
           nom?: string
           prenom?: string
           email?: string

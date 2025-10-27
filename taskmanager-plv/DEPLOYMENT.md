@@ -43,16 +43,22 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=votre-anon-key
 npm install
 ```
 
-### 3. Créer le premier administrateur
+### 3. Initialiser les données de test (Optionnel)
 
-Le premier utilisateur admin doit être créé manuellement:
+Pour faciliter les tests, vous pouvez utiliser les données de test fournies:
+
+1. Suivez le guide dans `supabase/README_SEED.md`
+2. Créez les utilisateurs de test dans Supabase Auth
+3. Exécutez le script `supabase/seed.sql`
+
+**OU** créez le premier administrateur manuellement:
 
 1. Dans Supabase, allez dans **Authentication** > **Users**
 2. Cliquez sur **Add user** > **Create new user**
 3. Entrez un email et un mot de passe
 4. Allez dans **Table Editor** > **profiles**
 5. Trouvez l'utilisateur créé
-6. Modifiez le champ `role` en `admin`
+6. Modifiez le champ `roles` en `["admin"]` (format JSON array)
 7. Sauvegardez
 
 ### 4. Lancer l'application en développement
