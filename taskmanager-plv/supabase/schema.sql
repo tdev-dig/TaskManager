@@ -1,7 +1,11 @@
+-- Create enum types
+CREATE TYPE user_role AS ENUM ('admin', 'commercial', 'client');
+CREATE TYPE order_status AS ENUM ('en_attente', 'en_cours', 'termine', 'livre');
+
 -- Create profiles table
 CREATE TABLE IF NOT EXISTS profiles (
   id UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
-  role TEXT NOT NULL CHECK (role IN ('admin', 'commercial', 'client')),
+  role user_role NOT NULL DEFAULT 'client',
   nom TEXT NOT NULL,
   prenom TEXT NOT NULL,
   email TEXT UNIQUE NOT NULL,
@@ -27,7 +31,7 @@ CREATE TABLE IF NOT EXISTS commandes (
   commercial_id UUID REFERENCES profiles(id) ON DELETE SET NULL,
   produit TEXT NOT NULL,
   quantite INTEGER NOT NULL CHECK (quantite > 0),
-  statut TEXT NOT NULL DEFAULT 'en_attente' CHECK (statut IN ('en_attente', 'en_cours', 'termine', 'livre')),
+  statut order_status NOT NULL DEFAULT 'en_attente',
   date_livraison DATE NOT NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -67,70 +71,144 @@ CREATE POLICY "Admins can view all profiles" ON profiles
     )
   );
 
-CREATE POLICY "Admins can insert profiles" ON profiles
+-- Allow manual user creation via Supabase dashboard (service role bypass)
+-- Allow admins to create users
+-- Allow automatic profile creation via trigger
+CREATE POLICY "Allow profile creation" ON profiles
   FOR INSERT WITH CHECK (
+    -- Service role (Supabase dashboard/API) can always insert
+    auth.jwt() ->> 'role' = 'service_role' OR
+    -- Admin users can create profiles
     EXISTS (
       SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'
-    )
+    ) OR
+    -- Allow trigger-based creation (when auth.uid() matches the inserted id)
+    auth.uid() = id
   );
 
-CREATE POLICY "Admins can update profiles" ON profiles
+CREATE POLICY "Admins and self can update profiles" ON profiles
   FOR UPDATE USING (
+    -- Service role can always update
+    auth.jwt() ->> 'role' = 'service_role' OR
+    -- Admin users can update any profile
+    EXISTS (
+      SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'
+    ) OR
+    -- Users can update their own profile
+    auth.uid() = id
+  );
+
+-- Allow deletion by admins and service role
+CREATE POLICY "Admins can delete profiles" ON profiles
+  FOR DELETE USING (
+    auth.jwt() ->> 'role' = 'service_role' OR
     EXISTS (
       SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'
     )
   );
 
 -- Policies for clients table
-CREATE POLICY "Commercials can view their clients" ON clients
+CREATE POLICY "Commercials and admins can view clients" ON clients
   FOR SELECT USING (
+    -- Service role can always access
+    auth.jwt() ->> 'role' = 'service_role' OR
+    -- Commercial can view their clients
     commercial_id = auth.uid() OR
+    -- Admins can view all clients
     EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
   );
 
-CREATE POLICY "Commercials can insert clients" ON clients
+CREATE POLICY "Commercials and admins can insert clients" ON clients
   FOR INSERT WITH CHECK (
+    -- Service role can always insert
+    auth.jwt() ->> 'role' = 'service_role' OR
+    -- Commercial can create clients assigned to them
     commercial_id = auth.uid() OR
+    -- Admins can create any client
     EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
   );
 
-CREATE POLICY "Commercials can update their clients" ON clients
+CREATE POLICY "Commercials and admins can update clients" ON clients
   FOR UPDATE USING (
+    -- Service role can always update
+    auth.jwt() ->> 'role' = 'service_role' OR
+    -- Commercial can update their clients
     commercial_id = auth.uid() OR
+    -- Admins can update any client
+    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
+  );
+
+CREATE POLICY "Commercials and admins can delete clients" ON clients
+  FOR DELETE USING (
+    -- Service role can always delete
+    auth.jwt() ->> 'role' = 'service_role' OR
+    -- Commercial can delete their clients
+    commercial_id = auth.uid() OR
+    -- Admins can delete any client
     EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
   );
 
 -- Policies for commandes table
 CREATE POLICY "Users can view relevant commandes" ON commandes
   FOR SELECT USING (
+    -- Service role can always access
+    auth.jwt() ->> 'role' = 'service_role' OR
+    -- Commercial can view their commandes
     commercial_id = auth.uid() OR
+    -- Admins can view all commandes
     EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin') OR
+    -- Client can view commandes through their client record
     EXISTS (
       SELECT 1 FROM clients 
-      JOIN profiles ON profiles.id = clients.commercial_id
       WHERE clients.id = commandes.client_id 
-      AND profiles.id = auth.uid()
+      AND clients.contact = (SELECT email FROM profiles WHERE id = auth.uid())
     )
   );
 
 CREATE POLICY "Commercials and admins can insert commandes" ON commandes
   FOR INSERT WITH CHECK (
+    -- Service role can always insert
+    auth.jwt() ->> 'role' = 'service_role' OR
+    -- Commercial can create commandes assigned to them
     commercial_id = auth.uid() OR
+    -- Admins can create any commande
     EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
   );
 
 CREATE POLICY "Commercials and admins can update commandes" ON commandes
   FOR UPDATE USING (
+    -- Service role can always update
+    auth.jwt() ->> 'role' = 'service_role' OR
+    -- Commercial can update their commandes
     commercial_id = auth.uid() OR
+    -- Admins can update any commande
+    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
+  );
+
+CREATE POLICY "Commercials and admins can delete commandes" ON commandes
+  FOR DELETE USING (
+    -- Service role can always delete
+    auth.jwt() ->> 'role' = 'service_role' OR
+    -- Commercial can delete their commandes
+    commercial_id = auth.uid() OR
+    -- Admins can delete any commande
     EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
   );
 
 -- Policies for stock table
-CREATE POLICY "Everyone can view stock" ON stock
-  FOR SELECT USING (true);
+CREATE POLICY "Authenticated users can view stock" ON stock
+  FOR SELECT USING (
+    -- Service role can always access
+    auth.jwt() ->> 'role' = 'service_role' OR
+    -- Any authenticated user can view stock
+    auth.uid() IS NOT NULL
+  );
 
 CREATE POLICY "Only admins can manage stock" ON stock
   FOR ALL USING (
+    -- Service role can always manage
+    auth.jwt() ->> 'role' = 'service_role' OR
+    -- Only admins can manage stock
     EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
   );
 
@@ -141,7 +219,7 @@ BEGIN
   INSERT INTO profiles (id, role, nom, prenom, email)
   VALUES (
     NEW.id,
-    'client',
+    'client'::user_role,
     COALESCE(NEW.raw_user_meta_data->>'nom', ''),
     COALESCE(NEW.raw_user_meta_data->>'prenom', ''),
     NEW.email

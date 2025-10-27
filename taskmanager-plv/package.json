@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "setup-seed": "node supabase/setup-seed-data.js",
+    "verify": "node scripts/verify-setup.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
