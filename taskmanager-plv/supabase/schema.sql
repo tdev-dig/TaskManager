@@ -1,7 +1,7 @@
 -- Create profiles table
 CREATE TABLE IF NOT EXISTS profiles (
   id UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
-  role TEXT NOT NULL CHECK (role IN ('admin', 'commercial', 'client')),
+  roles TEXT[] NOT NULL DEFAULT ARRAY['client'],
   nom TEXT NOT NULL,
   prenom TEXT NOT NULL,
   email TEXT UNIQUE NOT NULL,
@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS stock (
 );
 
 -- Create indexes for better performance
-CREATE INDEX IF NOT EXISTS idx_profiles_role ON profiles(role);
+CREATE INDEX IF NOT EXISTS idx_profiles_roles ON profiles USING GIN(roles);
 CREATE INDEX IF NOT EXISTS idx_profiles_email ON profiles(email);
 CREATE INDEX IF NOT EXISTS idx_clients_commercial ON clients(commercial_id);
 CREATE INDEX IF NOT EXISTS idx_commandes_client ON commandes(client_id);
@@ -63,48 +63,59 @@ CREATE POLICY "Users can view their own profile" ON profiles
 CREATE POLICY "Admins can view all profiles" ON profiles
   FOR SELECT USING (
     EXISTS (
-      SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'
+      SELECT 1 FROM profiles WHERE id = auth.uid() AND 'admin' = ANY(roles)
     )
+  );
+
+-- Allow initial profile creation (for seeding and manual creation)
+CREATE POLICY "Allow profile creation when no admin exists" ON profiles
+  FOR INSERT WITH CHECK (
+    -- Allow if user is admin OR no admin exists yet
+    (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND 'admin' = ANY(roles))) OR
+    (NOT EXISTS (SELECT 1 FROM profiles WHERE 'admin' = ANY(roles)))
   );
 
 CREATE POLICY "Admins can insert profiles" ON profiles
   FOR INSERT WITH CHECK (
     EXISTS (
-      SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'
+      SELECT 1 FROM profiles WHERE id = auth.uid() AND 'admin' = ANY(roles)
     )
   );
 
 CREATE POLICY "Admins can update profiles" ON profiles
   FOR UPDATE USING (
     EXISTS (
-      SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'
+      SELECT 1 FROM profiles WHERE id = auth.uid() AND 'admin' = ANY(roles)
     )
   );
+
+CREATE POLICY "Users can update their own profile" ON profiles
+  FOR UPDATE USING (auth.uid() = id);
 
 -- Policies for clients table
 CREATE POLICY "Commercials can view their clients" ON clients
   FOR SELECT USING (
     commercial_id = auth.uid() OR
-    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
+    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND 'admin' = ANY(roles))
   );
 
 CREATE POLICY "Commercials can insert clients" ON clients
   FOR INSERT WITH CHECK (
     commercial_id = auth.uid() OR
-    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
+    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND ('admin' = ANY(roles) OR 'commercial' = ANY(roles)))
   );
 
 CREATE POLICY "Commercials can update their clients" ON clients
   FOR UPDATE USING (
     commercial_id = auth.uid() OR
-    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
+    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND 'admin' = ANY(roles))
   );
 
 -- Policies for commandes table
 CREATE POLICY "Users can view relevant commandes" ON commandes
   FOR SELECT USING (
     commercial_id = auth.uid() OR
-    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin') OR
+    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND 'admin' = ANY(roles)) OR
     EXISTS (
       SELECT 1 FROM clients 
       JOIN profiles ON profiles.id = clients.commercial_id
@@ -116,13 +127,13 @@ CREATE POLICY "Users can view relevant commandes" ON commandes
 CREATE POLICY "Commercials and admins can insert commandes" ON commandes
   FOR INSERT WITH CHECK (
     commercial_id = auth.uid() OR
-    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
+    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND ('admin' = ANY(roles) OR 'commercial' = ANY(roles)))
   );
 
 CREATE POLICY "Commercials and admins can update commandes" ON commandes
   FOR UPDATE USING (
     commercial_id = auth.uid() OR
-    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
+    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND 'admin' = ANY(roles))
   );
 
 -- Policies for stock table
@@ -131,17 +142,17 @@ CREATE POLICY "Everyone can view stock" ON stock
 
 CREATE POLICY "Only admins can manage stock" ON stock
   FOR ALL USING (
-    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
+    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND 'admin' = ANY(roles))
   );
 
 -- Function to handle new user registration
 CREATE OR REPLACE FUNCTION handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
-  INSERT INTO profiles (id, role, nom, prenom, email)
+  INSERT INTO profiles (id, roles, nom, prenom, email)
   VALUES (
     NEW.id,
-    'client',
+    ARRAY['client'],
     COALESCE(NEW.raw_user_meta_data->>'nom', ''),
     COALESCE(NEW.raw_user_meta_data->>'prenom', ''),
     NEW.email

@@ -8,7 +8,7 @@ export async function getUser() {
 
 export type UserProfile = {
   id: string
-  role: 'admin' | 'commercial' | 'client'
+  roles: ('admin' | 'commercial' | 'client')[]
   nom: string
   prenom: string
   email: string
@@ -56,4 +56,41 @@ export async function signUp(email: string, password: string, metadata: {
 export async function signOut() {
   const supabase = await createClient()
   return await supabase.auth.signOut()
+}
+
+// Utility functions for role management
+export function hasRole(profile: UserProfile | null, role: 'admin' | 'commercial' | 'client'): boolean {
+  return profile?.roles?.includes(role) ?? false
+}
+
+export function hasAnyRole(profile: UserProfile | null, roles: ('admin' | 'commercial' | 'client')[]): boolean {
+  return profile?.roles?.some(role => roles.includes(role)) ?? false
+}
+
+export function isAdmin(profile: UserProfile | null): boolean {
+  return hasRole(profile, 'admin')
+}
+
+export function isCommercial(profile: UserProfile | null): boolean {
+  return hasRole(profile, 'commercial')
+}
+
+export function isClient(profile: UserProfile | null): boolean {
+  return hasRole(profile, 'client')
+}
+
+export function canManageUsers(profile: UserProfile | null): boolean {
+  return isAdmin(profile)
+}
+
+export function canManageClients(profile: UserProfile | null): boolean {
+  return hasAnyRole(profile, ['admin', 'commercial'])
+}
+
+export function canManageOrders(profile: UserProfile | null): boolean {
+  return hasAnyRole(profile, ['admin', 'commercial'])
+}
+
+export function canManageStock(profile: UserProfile | null): boolean {
+  return isAdmin(profile)
 }
