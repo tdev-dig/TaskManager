@@ -1,0 +1,19 @@
+-- Script pour désactiver la confirmation d'email (développement uniquement)
+-- 
+-- IMPORTANT: Ce script ne peut pas être exécuté via SQL car la configuration
+-- de l'authentification se fait via l'interface Supabase
+--
+-- À la place, suivez ces étapes manuellement:
+--
+-- 1. Allez sur supabase.com
+-- 2. Sélectionnez votre projet
+-- 3. Allez dans "Authentication" > "Settings" (ou "Email Templates")
+-- 4. Sous "Email Auth", trouvez l'option "Enable email confirmations"
+-- 5. Décochez cette option pour le développement
+-- 6. Sauvegardez
+--
+-- Alternative: Si vous souhaitez garder la confirmation d'email activée,
+-- vous pouvez vérifier manuellement les utilisateurs dans:
+-- Authentication > Users > [Votre utilisateur] > Actions > Confirm email
+--
+-- Note: Pour la production, réactivez TOUJOURS la confirmation d'email!

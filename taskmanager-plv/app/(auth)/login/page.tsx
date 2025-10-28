@@ -21,43 +21,66 @@ export default function LoginPage() {
     setLoading(true)
     setError(null)
 
-    const supabase = createClient()
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
+    console.log('🔐 Tentative de connexion pour:', email)
 
-    if (error) {
-      setError(error.message)
-      setLoading(false)
-      return
-    }
-
-    if (data.user) {
-      // Récupérer le profil pour rediriger selon le rôle
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', data.user.id)
-        .single() as { data: { role: 'admin' | 'commercial' | 'client' } | null }
-
-      if (profile) {
-        switch (profile.role) {
-          case 'admin':
-            router.push('/dashboard/admin')
-            break
-          case 'commercial':
-            router.push('/dashboard/commercial')
-            break
-          case 'client':
-            router.push('/dashboard/client')
-            break
-        }
-        router.refresh()
+    try {
+      const supabase = createClient()
+      
+      // Vérifier la configuration Supabase
+      if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+        throw new Error('Configuration Supabase manquante. Vérifiez votre fichier .env.local')
       }
-    }
 
-    setLoading(false)
+      console.log('✅ Client Supabase créé')
+      
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
+
+      if (error) {
+        console.error('❌ Erreur de connexion:', error)
+        setError(`Erreur de connexion: ${error.message}`)
+        setLoading(false)
+        return
+      }
+
+      console.log('✅ Connexion réussie, utilisateur:', data.user?.id)
+
+      if (data.user) {
+        // Récupérer le profil pour rediriger selon le rôle
+        console.log('🔍 Récupération du profil...')
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', data.user.id)
+          .single() as { data: { role: 'admin' | 'commercial' | 'client' } | null, error: any }
+
+        if (profileError) {
+          console.error('❌ Erreur lors de la récupération du profil:', profileError)
+          setError(`Profil introuvable. Erreur: ${profileError.message}. Contactez un administrateur.`)
+          setLoading(false)
+          return
+        }
+
+        if (profile) {
+          console.log('✅ Profil trouvé, rôle:', profile.role)
+          const dashboardUrl = `/dashboard/${profile.role}`
+          console.log('🔄 Redirection vers:', dashboardUrl)
+          
+          router.push(dashboardUrl)
+          router.refresh()
+        } else {
+          console.error('❌ Profil null')
+          setError('Aucun profil trouvé pour cet utilisateur. Contactez un administrateur.')
+        }
+      }
+    } catch (err: any) {
+      console.error('❌ Erreur inattendue:', err)
+      setError(`Erreur: ${err.message}`)
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
