@@ -27,6 +27,8 @@ export default function SignupPage() {
     setLoading(true)
     setError(null)
 
+    console.log('📝 Tentative d\'inscription pour:', formData.email)
+
     if (formData.password !== formData.confirmPassword) {
       setError('Les mots de passe ne correspondent pas')
       setLoading(false)
@@ -39,31 +41,76 @@ export default function SignupPage() {
       return
     }
 
-    const supabase = createClient()
-    const { error } = await supabase.auth.signUp({
-      email: formData.email,
-      password: formData.password,
-      options: {
-        data: {
-          nom: formData.nom,
-          prenom: formData.prenom,
+    try {
+      const supabase = createClient()
+      
+      // Vérifier la configuration Supabase
+      if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+        throw new Error('Configuration Supabase manquante. Vérifiez votre fichier .env.local')
+      }
+
+      console.log('✅ Client Supabase créé')
+      console.log('📤 Envoi des données:', {
+        email: formData.email,
+        metadata: { nom: formData.nom, prenom: formData.prenom }
+      })
+
+      const { data, error } = await supabase.auth.signUp({
+        email: formData.email,
+        password: formData.password,
+        options: {
+          data: {
+            nom: formData.nom,
+            prenom: formData.prenom,
+          }
+        }
+      })
+
+      if (error) {
+        console.error('❌ Erreur d\'inscription:', error)
+        setError(`Erreur d'inscription: ${error.message}`)
+        setLoading(false)
+        return
+      }
+
+      console.log('✅ Inscription réussie!')
+      console.log('👤 Utilisateur créé:', data.user?.id)
+      console.log('📧 Email:', data.user?.email)
+      console.log('📝 Métadonnées:', data.user?.user_metadata)
+
+      // Vérifier si le profil a été créé
+      if (data.user) {
+        console.log('🔍 Vérification de la création du profil...')
+        
+        // Attendre un peu pour laisser le trigger s'exécuter
+        await new Promise(resolve => setTimeout(resolve, 1000))
+        
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', data.user.id)
+          .single()
+
+        if (profileError) {
+          console.warn('⚠️ Profil pas encore créé:', profileError.message)
+          console.log('ℹ️ Le profil sera créé automatiquement. Vous pourrez vous connecter dans quelques instants.')
+        } else {
+          console.log('✅ Profil créé avec succès:', profileData)
         }
       }
-    })
 
-    if (error) {
-      setError(error.message)
+      setSuccess(true)
       setLoading(false)
-      return
+      
+      // Rediriger après 3 secondes (plus de temps pour le trigger)
+      setTimeout(() => {
+        router.push('/login')
+      }, 3000)
+    } catch (err: any) {
+      console.error('❌ Erreur inattendue:', err)
+      setError(`Erreur: ${err.message}`)
+      setLoading(false)
     }
-
-    setSuccess(true)
-    setLoading(false)
-    
-    // Rediriger après 2 secondes
-    setTimeout(() => {
-      router.push('/login')
-    }, 2000)
   }
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
